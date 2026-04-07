@@ -691,4 +691,5 @@ BASE_URL = os.environ.get("DJANGO_BASE_URL", "http://localhost:8000")
 
 # DOCX Editor 集成配置
 DOCX_EDITOR_BASE_URL = os.environ.get("DOCX_EDITOR_BASE_URL", "").rstrip("/")
+DOCX_EDITOR_PUBLIC_BASE_URL = os.environ.get("DOCX_EDITOR_PUBLIC_BASE_URL", "").rstrip("/")
 DOCX_EDITOR_SERVICE_KEY = os.environ.get("DOCX_EDITOR_SERVICE_KEY", "").strip()

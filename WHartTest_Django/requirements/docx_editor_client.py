@@ -12,6 +12,7 @@ class DocxEditorClientError(RuntimeError):
 
 def create_docx_editor_session(document, pushback_url: str) -> dict:
     base_url = str(getattr(settings, "DOCX_EDITOR_BASE_URL", "") or "").strip().rstrip("/")
+    public_base_url = str(getattr(settings, "DOCX_EDITOR_PUBLIC_BASE_URL", "") or "").strip().rstrip("/")
     service_key = str(getattr(settings, "DOCX_EDITOR_SERVICE_KEY", "") or "").strip()
     if not base_url:
         raise DocxEditorClientError("DOCX_EDITOR_BASE_URL 未配置")
@@ -25,6 +26,8 @@ def create_docx_editor_session(document, pushback_url: str) -> dict:
         "Authorization": f"Bearer {service_key}",
         "User-Agent": "wharttest-docx-editor-client",
     }
+    if public_base_url:
+        headers["X-Docx-Editor-Public-Base-Url"] = public_base_url
     data = {
         "source_system": "wharttest",
         "source_document_id": str(document.id),

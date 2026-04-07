@@ -10,6 +10,7 @@ import time
 
 from projects.models import Project, ProjectMember
 
+from .docx_editor_client import create_docx_editor_session
 from .models import DocumentImage, RequirementDocument
 from .services import DocumentProcessor
 
@@ -71,6 +72,59 @@ class DocxEditorSessionActionTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("仅 Word 文档支持在线编辑", response.data["error"])
+
+
+class DocxEditorClientTests(TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.override_media = override_settings(MEDIA_ROOT=self.temp_dir.name)
+        self.override_media.enable()
+        self.addCleanup(self.override_media.disable)
+        self.user = User.objects.create_user(username="docx-client", password="password123")
+        self.project = Project.objects.create(name="Docx Client Project", creator=self.user)
+        ProjectMember.objects.create(project=self.project, user=self.user, role="member")
+        self.document = RequirementDocument.objects.create(
+            project=self.project,
+            title="Word Requirement",
+            document_type="docx",
+            file=SimpleUploadedFile(
+                "requirement.docx",
+                b"word-content",
+                content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ),
+            uploader=self.user,
+        )
+
+    @override_settings(
+        DOCX_EDITOR_BASE_URL="http://docx-editor.internal:18080",
+        DOCX_EDITOR_PUBLIC_BASE_URL="https://docx.example.com",
+        DOCX_EDITOR_SERVICE_KEY="service-key",
+    )
+    @patch("requirements.docx_editor_client.requests.post")
+    def test_sends_public_base_url_header_when_configured(self, mock_post):
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {
+            "launch_url": "https://docx.example.com/embed/binding-1?token=abc",
+        }
+
+        payload = create_docx_editor_session(
+            self.document,
+            pushback_url=f"/api/requirements/documents/{self.document.id}/upload-edited-file/",
+        )
+
+        self.assertEqual(
+            mock_post.call_args.kwargs["headers"]["X-Docx-Editor-Public-Base-Url"],
+            "https://docx.example.com",
+        )
+        self.assertEqual(
+            mock_post.call_args.kwargs["headers"]["Authorization"],
+            "Bearer service-key",
+        )
+        self.assertEqual(
+            payload["launch_url"],
+            "https://docx.example.com/embed/binding-1?token=abc",
+        )
 
 
 class UploadEditedFileActionTests(TestCase):

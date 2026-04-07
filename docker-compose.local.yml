@@ -100,6 +100,7 @@ services:
       - DJANGO_BASE_URL=http://localhost:8000
       - WEIXIN_PLUGIN_HOST_URL=http://weixin-plugin-host:3001
       - DOCX_EDITOR_BASE_URL=${DOCX_EDITOR_BASE_URL:-http://host.docker.internal:18080}
+      - DOCX_EDITOR_PUBLIC_BASE_URL=${DOCX_EDITOR_PUBLIC_BASE_URL:-}
       - DOCX_EDITOR_SERVICE_KEY=${DOCX_EDITOR_SERVICE_KEY:-docx-editor-default-integration-key-2026}
       # Qdrant向量数据库
       - QDRANT_URL=http://qdrant:6333
