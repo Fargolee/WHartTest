@@ -195,6 +195,27 @@ WSGI_APPLICATION = "wharttest_django.wsgi.application"
 # DATABASE_PATH: SQLite 文件路径（仅 sqlite 模式）
 # POSTGRES_*: PostgreSQL 连接参数（仅 postgres 模式）
 
+# 根据 git 分支后缀自动选择本地开发数据库，避免切分支时来回跑迁移。
+# -github → wharttest_dev_github, -pro → wharttest_dev_pro, 其他 → wharttest_dev
+def _get_postgres_db_name():
+    env_db = os.environ.get("POSTGRES_DB")
+    if env_db:
+        return env_db
+    import subprocess
+    try:
+        branch = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            stderr=subprocess.DEVNULL, cwd=BASE_DIR,
+        ).decode().strip()
+        if branch.endswith("-github"):
+            return "wharttest_dev_github"
+        if branch.endswith("-pro"):
+            return "wharttest_dev_pro"
+    except Exception:
+        pass
+    return "wharttest_dev"
+
+
 # 读取数据库类型（默认 postgres）。
 DATABASE_TYPE = os.environ.get("DATABASE_TYPE", "postgres")
 
@@ -204,7 +225,7 @@ if DATABASE_TYPE == "postgres":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.environ.get("POSTGRES_DB", "wharttest"),
+            "NAME": _get_postgres_db_name(),
             "USER": os.environ.get("POSTGRES_USER", "postgres"),
             "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "postgres"),
             "HOST": os.environ.get("POSTGRES_HOST", "127.0.0.1"),

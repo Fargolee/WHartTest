@@ -687,7 +687,7 @@ const memberColumns = computed(() => [
     title: pageText.value.joinedAt,
     dataIndex: 'joined_at',
     slotName: 'joined_at',
-    width: 155,
+    width: 180,
   },
   {
     title: pageText.value.operations,
