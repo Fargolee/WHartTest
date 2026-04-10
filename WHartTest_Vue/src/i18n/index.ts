@@ -1163,6 +1163,21 @@ const LEGACY_EXACT_EN_MAP: Record<string, string> = {
   'H4标题：': 'H4 headings:',
   'H5标题：': 'H5 headings:',
   'H6标题：': 'H6 headings:',
+
+  // ── 模块管理面板（ModuleManagementPanel）──
+  '添加根模块': 'Add root module',
+  '添加子模块': 'Add child module',
+  '删除模块': 'Delete module',
+  '删除模块失败': 'Failed to delete module',
+  '删除模块时发生错误': 'An error occurred while deleting the module',
+  '确认删除': 'Confirm deletion',
+
+  // ── 审核状态 ──
+  '待审核': 'Pending',
+  '通过': 'Passed',
+  '优化': 'Optimize',
+  '优化待审核': 'Re-review',
+  '不可用': 'N/A',
 };
 
 const LEGACY_REGEX_EN_MAP: Array<[RegExp, (...groups: string[]) => string]> = [
@@ -1192,6 +1207,7 @@ const LEGACY_REGEX_EN_MAP: Array<[RegExp, (...groups: string[]) => string]> = [
   [/^步骤详情\s*-\s*(.*)$/, (name) => `Step Details - ${name}`.trim()],
   [/^用例步骤\s*-\s*(.*)$/, (name) => `Case Steps - ${name}`.trim()],
   [/^确定要删除模块\s+"(.+)"\s+吗？$/, (name) => `Delete module "${name}"?`],
+  [/^确定要删除模块\s+"(.+)"\s+吗？此操作不可恢复。$/, (name) => `Delete module "${name}"? This action cannot be undone.`],
   [/^强制更新完成！更新了\s+(\d+)\s+个提示词$/, (count) => `Force update completed. Updated ${count} prompt(s).`],
   [/^初始化完成！创建了\s+(\d+)\s+个提示词，跳过\s+(\d+)\s+个$/, (created, skipped) => `Initialization completed. Created ${created} prompt(s) and skipped ${skipped}.`],
   [/^会话状态：(.+)$/, (value) => `Session status: ${value}`],

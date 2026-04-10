@@ -404,13 +404,13 @@ const generateModeOptions = computed(() => (
 const testTypeOptions = computed(() => (
   isEnglish.value
     ? [
-        { value: 'smoke', label: 'Smoke test' },
-        { value: 'functional', label: 'Functional test' },
-        { value: 'boundary', label: 'Boundary test' },
-        { value: 'exception', label: 'Exception test' },
-        { value: 'permission', label: 'Permission test' },
-        { value: 'security', label: 'Security test' },
-        { value: 'compatibility', label: 'Compatibility test' },
+        { value: 'smoke', label: 'Smoke' },
+        { value: 'functional', label: 'Functional' },
+        { value: 'boundary', label: 'Boundary' },
+        { value: 'exception', label: 'Exception' },
+        { value: 'permission', label: 'Permission' },
+        { value: 'security', label: 'Security' },
+        { value: 'compatibility', label: 'Compatibility' },
       ]
     : [
         { value: 'smoke', label: '冒烟测试' },

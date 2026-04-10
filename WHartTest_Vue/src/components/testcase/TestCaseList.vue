@@ -223,7 +223,7 @@ const pageText = computed(() => (
         priorityFilter: 'Filter priority',
         reviewStatusFilter: 'Filter review status',
         typeShort: 'Type',
-        testTypeFilter: 'Filter test type',
+        testTypeFilter: 'Test type',
         export: 'Export',
         import: 'Import',
         batchDeleteButton: (count: number) => `Batch delete (${count})`,
@@ -334,11 +334,11 @@ const levelOptions = computed(() => (
 const reviewStatusOptions = computed(() => (
   isEnglish.value
     ? [
-        { value: 'pending_review', label: 'Pending review', color: 'orange' },
+        { value: 'pending_review', label: 'Pending', color: 'orange' },
         { value: 'approved', label: 'Approved', color: 'green' },
-        { value: 'needs_optimization', label: 'Needs optimization', color: 'blue' },
-        { value: 'optimization_pending_review', label: 'Optimization pending review', color: 'purple' },
-        { value: 'unavailable', label: 'Unavailable', color: 'red' },
+        { value: 'needs_optimization', label: 'Optimize', color: 'blue' },
+        { value: 'optimization_pending_review', label: 'Re-review', color: 'purple' },
+        { value: 'unavailable', label: 'N/A', color: 'red' },
       ]
     : [
         { value: 'pending_review', label: '待审核', color: 'orange' },
@@ -352,13 +352,13 @@ const reviewStatusOptions = computed(() => (
 const testTypeOptions = computed(() => (
   isEnglish.value
     ? [
-        { value: 'smoke', label: 'Smoke test' },
-        { value: 'functional', label: 'Functional test' },
-        { value: 'boundary', label: 'Boundary test' },
-        { value: 'exception', label: 'Exception test' },
-        { value: 'permission', label: 'Permission test' },
-        { value: 'security', label: 'Security test' },
-        { value: 'compatibility', label: 'Compatibility test' },
+        { value: 'smoke', label: 'Smoke' },
+        { value: 'functional', label: 'Functional' },
+        { value: 'boundary', label: 'Boundary' },
+        { value: 'exception', label: 'Exception' },
+        { value: 'permission', label: 'Permission' },
+        { value: 'security', label: 'Security' },
+        { value: 'compatibility', label: 'Compatibility' },
       ]
     : [
         { value: 'smoke', label: '冒烟测试' },
