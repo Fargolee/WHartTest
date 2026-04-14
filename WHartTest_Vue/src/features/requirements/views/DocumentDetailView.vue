@@ -1867,6 +1867,7 @@ onBeforeUnmount(() => {
   color: #333;
   min-height: 40px;
   border: 1px solid rgba(0, 0, 0, 0.05);
+  text-align: left;
 }
 
 .segment-collapsed-placeholder {
