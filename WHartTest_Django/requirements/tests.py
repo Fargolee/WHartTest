@@ -4,6 +4,7 @@ import time
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import Permission, User
+from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -13,7 +14,7 @@ from rest_framework.test import APIClient
 from api_keys.models import APIKey
 from projects.models import Project, ProjectMember
 
-from .docx_editor_client import create_docx_editor_session
+from .docx_editor_client import DocxEditorClientError, create_docx_editor_session
 from .models import DocumentImage, RequirementDocument, RequirementModule, ReviewReport
 from .services import DocumentProcessor
 
@@ -144,6 +145,23 @@ class DocxEditorClientTests(TestCase):
             "https://docx.example.com/embed/binding-1?token=abc",
         )
 
+    @override_settings(
+        DOCX_EDITOR_BASE_URL="http://docx-editor.internal:18080",
+        DOCX_EDITOR_PUBLIC_BASE_URL="https://docx.example.com",
+        DOCX_EDITOR_SERVICE_KEY="service-key",
+    )
+    def test_rejects_missing_source_file_before_upload(self):
+        default_storage.delete(self.document.file.name)
+
+        with self.assertRaisesMessage(
+            DocxEditorClientError,
+            "主项目中的源文件不存在，请重新上传该文档后再试。",
+        ):
+            create_docx_editor_session(
+                self.document,
+                pushback_url=f"/api/requirements/documents/{self.document.id}/upload-edited-file/",
+            )
+
 
 class RequirementDocumentDocxEditorTests(TestCase):
     def setUp(self):
@@ -237,6 +255,26 @@ class RequirementDocumentDocxEditorTests(TestCase):
         self.assertEqual(
             kwargs["data"]["pushback_url"],
             f"/api/requirements/documents/{self.document.id}/upload-edited-file/",
+        )
+
+    @override_settings(
+        DOCX_EDITOR_BASE_URL="http://127.0.0.1:18080",
+        DOCX_EDITOR_PUBLIC_BASE_URL="http://172.16.3.183:18080",
+        DOCX_EDITOR_SERVICE_KEY="integration-key",
+    )
+    def test_launch_online_editor_rejects_missing_source_file(self):
+        self.client.force_authenticate(self.superuser)
+        default_storage.delete(self.document.file.name)
+
+        response = self.client.post(f"{self.detail_base}/launch-online-editor/")
+
+        payload = response.json()
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertEqual(
+            payload.get("detail")
+            or payload.get("error")
+            or ((payload.get("errors") or {}).get("detail")),
+            "主项目中的源文件不存在，可能已被删除或丢失，请重新上传该文档后再试。",
         )
 
     @patch("requirements.docx_editor_integration.DocumentProcessor")

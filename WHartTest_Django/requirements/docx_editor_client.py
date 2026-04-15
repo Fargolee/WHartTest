@@ -24,6 +24,15 @@ def create_docx_editor_session(document, pushback_url: str) -> dict:
         raise DocxEditorNotConfiguredError("在线编辑服务未配置，请联系管理员配置 DOCX Editor 服务。")
     if not document.file:
         raise DocxEditorClientError("该文档没有原始文件")
+    file_name = str(getattr(document.file, "name", "") or "").strip()
+    if not file_name:
+        raise DocxEditorClientError("该文档没有原始文件")
+    try:
+        exists = document.file.storage.exists(file_name)
+    except Exception:
+        exists = False
+    if not exists:
+        raise DocxEditorClientError("主项目中的源文件不存在，请重新上传该文档后再试。")
 
     endpoint = f"{base_url}/api/integration/external-documents/upsert-and-launch"
     headers = {
@@ -36,7 +45,7 @@ def create_docx_editor_session(document, pushback_url: str) -> dict:
         "source_system": "wharttest",
         "source_document_id": str(document.id),
         "title": document.title,
-        "filename": Path(document.file.name).name,
+        "filename": Path(file_name).name,
         "pushback_url": pushback_url,
     }
     if document.updated_at:
@@ -50,7 +59,7 @@ def create_docx_editor_session(document, pushback_url: str) -> dict:
     with open(document.file.path, "rb") as handle:
         files = {
             "file": (
-                Path(document.file.name).name,
+                Path(file_name).name,
                 handle,
                 content_type,
             )

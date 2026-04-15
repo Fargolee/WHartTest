@@ -61,6 +61,22 @@ def _extract_message(payload: Any, fallback: str) -> str:
     return fallback
 
 
+def _ensure_source_file_exists(document: RequirementDocument) -> None:
+    file_name = str(getattr(document.file, "name", "") or "").strip()
+    if not file_name:
+        raise DocxEditorIntegrationError("当前文档没有源文件，无法发起在线编辑。")
+
+    try:
+        exists = document.file.storage.exists(file_name)
+    except Exception:
+        exists = False
+
+    if not exists:
+        raise DocxEditorIntegrationError(
+            "主项目中的源文件不存在，可能已被删除或丢失，请重新上传该文档后再试。"
+        )
+
+
 def _extract_launch_payload(payload: Any) -> dict[str, Any]:
     if isinstance(payload, dict):
         nested = payload.get("data")
@@ -87,6 +103,7 @@ def launch_requirement_document_in_docx_editor(
 
     if not document.file:
         raise DocxEditorIntegrationError("当前文档没有源文件，无法发起在线编辑。")
+    _ensure_source_file_exists(document)
 
     request_url = f"{base_url}/api/integration/external-documents/upsert-and-launch"
     filename = Path(document.file.name).name
