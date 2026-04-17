@@ -416,8 +416,10 @@ const shouldCollapse = computed(() => {
     return true;
   }
 
-  const lines = props.message.content.split('\n').length;
-  return lines > 4;
+  const content = props.message.content;
+  const lines = content.split('\n').length;
+  // 紧凑JSON可能只有1行但格式化后很长，同时检查字符长度
+  return lines > 4 || content.length > 200;
 });
 
 const canPreviewDiagram = computed(() => {
