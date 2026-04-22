@@ -43,7 +43,7 @@ docker-images
 build/
 dist/
 out/
-
+PandaWiki-skill/
 # Dependencies (handled by subdirectories, but backup)
 node_modules/
 nltk_data/
