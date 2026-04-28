@@ -20,6 +20,7 @@ import { useApiTabsStore } from '../../stores/apiTabsStore'
 interface Props {
   interface?: ApiInterface
   modules?: ApiModule[]
+  selectedModule?: ApiModule
   autoDebug?: boolean
 }
 
@@ -38,6 +39,7 @@ interface ApiModule {
 const props = withDefaults(defineProps<Props>(), {
   interface: undefined,
   modules: () => [],
+  selectedModule: undefined,
   autoDebug: false
 })
 
@@ -208,18 +210,13 @@ const handleSend = async (requestData: { method: string, url: string, id?: numbe
       if (body) {
         if (body.type === 'none') {
           quickDebugData.body = null;
-        } else if (body.type === 'raw') {
-          // raw 类型：传 {type, content} 格式，runner 会解析
-          quickDebugData.body = { type: 'raw', content: body.content };
         } else if (['form-data', 'x-www-form-urlencoded'].includes(body.type)) {
-          // form 类型：转为扁平 dict
-          quickDebugData.body = {};
-          const formData = body.content as KeyValuePair[];
-          formData.forEach(item => {
-            if (item.enabled && item.key) {
-              quickDebugData.body[item.key] = item.value;
-            }
-          });
+          quickDebugData.body = {
+            type: body.type,
+            content: (body.content as KeyValuePair[]).filter(item => item.enabled && item.key)
+          };
+        } else if (body.type === 'raw') {
+          quickDebugData.body = { type: 'raw', content: body.content };
         }
       }
 
@@ -305,17 +302,36 @@ const savingLoading = ref(false)
 const sendingLoading = ref(false)
 const quickDebugLoading = ref(false)
 
+const normalizeModuleValue = (moduleValue: unknown) => {
+  if (typeof moduleValue === 'object' && moduleValue !== null && 'value' in moduleValue) {
+    return normalizeModuleValue((moduleValue as { value?: unknown }).value)
+  }
+
+  if (typeof moduleValue === 'boolean') {
+    return undefined
+  }
+
+  if (moduleValue === null || moduleValue === undefined || moduleValue === '') {
+    return undefined
+  }
+
+  const normalizedId = Number(moduleValue)
+  return Number.isFinite(normalizedId) && normalizedId > 0 ? normalizedId : undefined
+}
+
 // 获取当前环境ID
 const currentEnvironmentId = computed(() => environmentStore.currentEnvironmentId)
 
 // 处理保存用例
-const handleSave = async (requestData: { method: string, url: string, name: string, module: number }) => {
+const handleSave = async (requestData: { method: string, url: string, name: string, module?: number | string | null }) => {
   if (!projectStore.currentProjectId) {
     Message.warning('请先选择项目')
     return
   }
 
-  if (!requestData.module) {
+  const normalizedModuleId = normalizeModuleValue(requestData.module)
+
+  if (!normalizedModuleId) {
     Message.warning('请选择模块')
     return
   }
@@ -366,7 +382,7 @@ const handleSave = async (requestData: { method: string, url: string, name: stri
       method: requestData.method,
       url: requestData.url,
       project: Number(projectStore.currentProjectId),
-      module: requestData.module,
+      module: normalizedModuleId,
       headers,
       params,
       body,
@@ -384,7 +400,7 @@ const handleSave = async (requestData: { method: string, url: string, name: stri
       Message.success('更新接口成功')
       savedInterface = response.data
       emit('update:interface', savedInterface)
-      emit('refresh', props.interface.module)
+      emit('refresh', savedInterface?.module || normalizedModuleId)
     } else {
       const response = await createInterface(data)
       console.log('创建接口响应:', response)
@@ -395,7 +411,7 @@ const handleSave = async (requestData: { method: string, url: string, name: stri
       // 不管接口数据是否完整，都尝试使用它
       // 即使数据不完整，缺失的字段可以使用默认值
       emit('update:interface', savedInterface)
-      emit('refresh', data.module!)
+      emit('refresh', normalizedModuleId)
     }
 
     // 确保更新后的接口数据包含ID
@@ -568,6 +584,7 @@ watch(() => props.autoDebug, async (newValue) => {
           ref="requestHeaderRef"
           :modules="props.modules || []"
           :interface="props.interface"
+          :selected-module="props.selectedModule"
           :saving-loading="savingLoading"
           :sending-loading="sendingLoading"
           :quick-debug-loading="quickDebugLoading"

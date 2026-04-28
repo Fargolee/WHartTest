@@ -8,6 +8,11 @@ from httprunner.models import TestCaseSummary
 from httprunner.parser import Parser
 
 from api_functions.models import ApiCustomFunction
+from .payloads import (
+    flatten_key_value_pairs,
+    normalize_request_body,
+    prepare_request_body_for_runner,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +163,7 @@ class InterfaceRunner(HttpRunner):
         # Query params
         if self.interface_data.get('params'):
             params = {}
-            for k, v in self.interface_data['params'].items():
+            for k, v in flatten_key_value_pairs(self.interface_data['params']).items():
                 if isinstance(v, str) and v.startswith('$'):
                     var_name = v[1:]
                     params[k] = self.variables.get(var_name, v)
@@ -173,35 +178,24 @@ class InterfaceRunner(HttpRunner):
             headers_dict.update(global_headers)
 
         if self.interface_data.get('headers'):
-            headers = self.interface_data['headers']
-            if isinstance(headers, dict):
-                headers_dict.update(headers)
-            elif isinstance(headers, list):
-                for header in headers:
-                    if isinstance(header, dict) and header.get('enabled', True):
-                        headers_dict[header['key']] = header['value']
+            headers_dict.update(flatten_key_value_pairs(self.interface_data['headers']))
 
         if headers_dict:
             step_obj = step_obj.with_headers(**headers_dict)
 
         # Request body
         if self.interface_data.get('body'):
-            body = self.interface_data['body']
+            normalized_body = normalize_request_body(self.interface_data['body'])
+            body = prepare_request_body_for_runner(normalized_body)
             if isinstance(body, str) and body.startswith('$'):
                 var_name = body[1:]
                 if var_name in self.variables:
                     body = self.variables[var_name]
-            if isinstance(body, dict) and 'type' in body and 'content' in body:
-                if body['type'] == 'raw':
-                    content = body['content']
-                    if isinstance(content, str):
-                        try:
-                            body = json.loads(content)
-                        except json.JSONDecodeError:
-                            body = content
-                    else:
-                        body = content
-            step_obj = step_obj.with_json(body)
+            if body is not None:
+                if normalized_body['type'] in {'form-data', 'x-www-form-urlencoded', 'binary'}:
+                    step_obj = step_obj.with_data(body)
+                else:
+                    step_obj = step_obj.with_json(body)
 
         # Extract
         if self.interface_data.get('extract'):
@@ -402,7 +396,7 @@ class InterfaceRunner(HttpRunner):
         elif hasattr(data, 'req_resps') and isinstance(data.req_resps, list):  # type: ignore
             req_resps = data.req_resps  # type: ignore
             if req_resps:
-                req_resp = req_resps[0]
+                req_resp = req_resps[-1]
 
         if hasattr(data, 'stat'):
             stat = data.stat  # type: ignore

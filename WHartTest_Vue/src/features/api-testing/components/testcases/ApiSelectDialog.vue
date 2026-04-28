@@ -89,7 +89,7 @@ const loadModuleInterfaces = async (moduleId: number, page = 1) => {
 
   try {
     const res = await interfaceService.list(projectStore.currentProjectId, {
-      module: moduleId,
+      module_id: moduleId,
       page: page,
       page_size: pagination.value.pageSize
     })

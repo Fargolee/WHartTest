@@ -3,6 +3,20 @@ import type { UserBrief } from './common';
 export type InterfaceType = 'http' | 'sql';
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 export type SqlMethod = 'fetchone' | 'fetchmany' | 'fetchall' | 'insert' | 'update' | 'delete';
+export type ApiBodyType = 'none' | 'form-data' | 'x-www-form-urlencoded' | 'raw' | 'binary';
+
+export interface ApiKeyValuePair {
+  key: string;
+  value: string;
+  enabled?: boolean;
+  description?: string;
+  [key: string]: any;
+}
+
+export interface ApiRequestBody {
+  type: ApiBodyType;
+  content: any;
+}
 
 export interface ApiInterface {
   id: number;
@@ -12,9 +26,9 @@ export interface ApiInterface {
   // HTTP fields
   method: HttpMethod | null;
   url: string | null;
-  headers: Record<string, any>;
-  params: Record<string, any>;
-  body: Record<string, any>;
+  headers: ApiKeyValuePair[];
+  params: ApiKeyValuePair[];
+  body: ApiRequestBody;
 
   // SQL fields
   sql_method: SqlMethod | null;

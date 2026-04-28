@@ -15,6 +15,7 @@ interface ExtendedApiInterface extends ApiInterface {
 interface Props {
   modules?: ApiModule[]
   interface?: ApiInterface
+  selectedModule?: ApiModule
   savingLoading?: boolean
   sendingLoading?: boolean
   quickDebugLoading?: boolean
@@ -65,6 +66,7 @@ interface ApiModule {
 const props = withDefaults(defineProps<Props>(), {
   modules: () => [],
   interface: undefined,
+  selectedModule: undefined,
   savingLoading: false,
   sendingLoading: false,
   quickDebugLoading: false
@@ -96,6 +98,7 @@ const normalizeModuleValue = (moduleValue: unknown) => {
 const apiName = ref('')
 // 选择的模块
 const selectedModule = ref<number>()
+const lastDefaultModuleId = ref<number>()
 // 请求URL
 const requestUrl = ref('')
 // 当前选中的请求方法
@@ -127,11 +130,12 @@ const handleSend = () => {
 
 // 保存用例
 const handleSave = () => {
+  const normalizedModuleId = normalizeModuleValue(selectedModule.value)
   emit('save', {
     name: apiName.value,
     method: selectedMethod.value,
     url: requestUrl.value,
-    module: selectedModule.value,
+    module: normalizedModuleId,
     id: props.interface?.id
   })
 }
@@ -147,6 +151,11 @@ const getCurrentMethodColor = () => {
   return httpMethods.find(m => m.value === selectedMethod.value)?.color || 'method-default'
 }
 
+const applyDefaultModule = (moduleId?: number) => {
+  selectedModule.value = moduleId
+  lastDefaultModuleId.value = moduleId
+}
+
 // 监听接口数据变化
 watch(() => props.interface, (newInterface) => {
   console.log('接口数据更新：', newInterface)
@@ -156,14 +165,33 @@ watch(() => props.interface, (newInterface) => {
     selectedMethod.value = newInterface.method || 'GET'
     requestUrl.value = newInterface.url || ''
     selectedModule.value = normalizeModuleValue(newInterface.module)
+    lastDefaultModuleId.value = undefined
   } else {
     // 清空表单数据
     apiName.value = ''
     selectedMethod.value = 'GET'
     requestUrl.value = ''
-    selectedModule.value = undefined
+    applyDefaultModule(normalizeModuleValue(props.selectedModule?.id))
   }
 }, { immediate: true, deep: true })
+
+watch(() => props.selectedModule?.id, (newModuleId, oldModuleId) => {
+  if (props.interface) {
+    return
+  }
+
+  const normalizedCurrent = normalizeModuleValue(selectedModule.value)
+  const normalizedPreviousDefault = normalizeModuleValue(oldModuleId)
+  const normalizedNextDefault = normalizeModuleValue(newModuleId)
+
+  if (
+    normalizedCurrent === undefined ||
+    normalizedCurrent === lastDefaultModuleId.value ||
+    normalizedCurrent === normalizedPreviousDefault
+  ) {
+    applyDefaultModule(normalizedNextDefault)
+  }
+})
 
 const handleQuickDebug = async () => {
   if (!requestUrl.value) {

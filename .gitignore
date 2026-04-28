@@ -71,3 +71,5 @@ WHartTest_Actuator/browsers/
 .github/copilot-instructions.md
 WHartTest_Django/celerybeat-schedule
 AGENTS.md
+WHartTest_IDEA_Plugin/
+WHartTest_VSCode_Extension/

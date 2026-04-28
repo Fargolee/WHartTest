@@ -3,6 +3,11 @@ import json
 import logging
 import types
 from httprunner import HttpRunner, Config, Step, RunRequest, RunSqlRequest
+from api_interfaces.payloads import (
+    flatten_key_value_pairs,
+    normalize_request_body,
+    prepare_request_body_for_runner,
+)
 from .models import ApiTestCase, ApiTestCaseStep
 
 logger = logging.getLogger('testrunner')
@@ -201,7 +206,7 @@ class TestCaseRunner(HttpRunner):
                 params = {}
                 if not isinstance(self.variables, dict):
                     self.variables = {}
-                for k, v in interface_data['params'].items():
+                for k, v in flatten_key_value_pairs(interface_data['params']).items():
                     if isinstance(v, str) and v.startswith('$'):
                         var_name = v[1:]
                         if var_name in self.variables:
@@ -217,24 +222,7 @@ class TestCaseRunner(HttpRunner):
                 try:
                     headers = interface_data.get('headers')
                     if headers:
-                        headers_dict = {}
-                        if isinstance(headers, dict):
-                            headers_dict = headers
-                        elif isinstance(headers, list):
-                            for header in headers:
-                                if isinstance(header, dict) and header.get('enabled', True):
-                                    headers_dict[header['key']] = header['value']
-                        elif isinstance(headers, str):
-                            try:
-                                parsed_headers = json.loads(headers)
-                                if isinstance(parsed_headers, dict):
-                                    headers_dict = parsed_headers
-                                elif isinstance(parsed_headers, list):
-                                    for header in parsed_headers:
-                                        if isinstance(header, dict) and header.get('enabled', True):
-                                            headers_dict[header['key']] = header['value']
-                            except Exception:
-                                pass
+                        headers_dict = flatten_key_value_pairs(headers)
 
                         if headers_dict:
                             step_obj = step_obj.with_headers(**headers_dict)
@@ -243,24 +231,18 @@ class TestCaseRunner(HttpRunner):
 
             # Add request body for HTTP requests
             if step_type != 'sql' and interface_data.get('body'):
-                body = interface_data['body']
+                normalized_body = normalize_request_body(interface_data['body'])
+                body = prepare_request_body_for_runner(normalized_body)
                 if isinstance(body, str) and body.startswith('$'):
                     var_name = body[1:]
                     if isinstance(self.variables, dict) and var_name in self.variables:
                         body = self.variables[var_name]
 
-                if isinstance(body, dict) and 'type' in body and 'content' in body:
-                    if body['type'] == 'raw':
-                        content = body['content']
-                        if isinstance(content, str):
-                            try:
-                                body = json.loads(content)
-                            except json.JSONDecodeError:
-                                body = content
-                        else:
-                            body = content
-
-                step_obj = step_obj.with_json(body)
+                if body is not None:
+                    if normalized_body['type'] in {'form-data', 'x-www-form-urlencoded', 'binary'}:
+                        step_obj = step_obj.with_data(body)
+                    else:
+                        step_obj = step_obj.with_json(body)
 
             # Set export variables
             if interface_data.get('export'):

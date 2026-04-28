@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
 from django.test import TestCase
@@ -485,6 +486,44 @@ class ApiInterfaceAPITest(TestCase):
         self.assertEqual(interface.project, self.project)
         self.assertEqual(interface.created_by, self.user)
 
+    def test_create_normalizes_legacy_headers_params_body_shapes(self):
+        """创建时将旧格式 headers/params/body 归一化为前端协议"""
+        data = {
+            'name': 'Legacy Shape API',
+            'type': 'http',
+            'method': 'POST',
+            'url': '/api/legacy',
+            'headers': {'Content-Type': 'application/json', 'X-Trace-Id': 123},
+            'params': {'page': 1, 'active': True},
+            'body': {'username': 'tester', 'roles': ['admin']},
+        }
+        response = self.client.post(self.base_url, data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.data['headers'],
+            [
+                {'key': 'Content-Type', 'value': 'application/json', 'description': '', 'enabled': True},
+                {'key': 'X-Trace-Id', 'value': '123', 'description': '', 'enabled': True},
+            ],
+        )
+        self.assertEqual(
+            response.data['params'],
+            [
+                {'key': 'page', 'value': '1', 'description': '', 'enabled': True},
+                {'key': 'active', 'value': 'True', 'description': '', 'enabled': True},
+            ],
+        )
+        self.assertEqual(
+            response.data['body'],
+            {'type': 'raw', 'content': {'username': 'tester', 'roles': ['admin']}},
+        )
+
+        interface = ApiInterface.objects.get(name='Legacy Shape API')
+        self.assertEqual(response.data['headers'], interface.headers)
+        self.assertEqual(response.data['params'], interface.params)
+        self.assertEqual(response.data['body'], interface.body)
+
     def test_create_sql_interface(self):
         """测试创建 SQL 接口"""
         data = {
@@ -499,6 +538,26 @@ class ApiInterfaceAPITest(TestCase):
         interface = ApiInterface.objects.get(name='New SQL Query')
         self.assertEqual(interface.type, 'sql')
 
+    def test_create_duplicate_name_returns_400(self):
+        """测试同项目重复接口名返回 400 而不是 500"""
+        ApiInterface.objects.create(
+            name='Duplicate API',
+            type='http',
+            method='GET',
+            url='/api/existing',
+            project=self.project,
+            created_by=self.user,
+        )
+        data = {
+            'name': 'Duplicate API',
+            'type': 'http',
+            'method': 'POST',
+            'url': '/api/new',
+        }
+        response = self.client.post(self.base_url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('name', response.data)
+
     def test_retrieve_interface(self):
         """测试获取单个接口"""
         interface = ApiInterface.objects.create(
@@ -508,6 +567,36 @@ class ApiInterfaceAPITest(TestCase):
         response = self.client.get(f'{self.base_url}{interface.pk}/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['name'], 'Detail API')
+
+    def test_retrieve_normalizes_legacy_stored_shapes(self):
+        """读取旧数据时返回前端可渲染的协议结构"""
+        interface = ApiInterface.objects.create(
+            name='Stored Legacy API',
+            type='http',
+            method='POST',
+            url='/api/stored-legacy',
+            headers={'Authorization': 'Bearer token'},
+            params={'page': 2},
+            body={'token': 'abc', 'meta': {'env': 'test'}},
+            project=self.project,
+            created_by=self.user,
+        )
+
+        response = self.client.get(f'{self.base_url}{interface.pk}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data['headers'],
+            [{'key': 'Authorization', 'value': 'Bearer token', 'description': '', 'enabled': True}],
+        )
+        self.assertEqual(
+            response.data['params'],
+            [{'key': 'page', 'value': '2', 'description': '', 'enabled': True}],
+        )
+        self.assertEqual(
+            response.data['body'],
+            {'type': 'raw', 'content': {'token': 'abc', 'meta': {'env': 'test'}}},
+        )
 
     def test_update_interface(self):
         """测试更新接口"""
@@ -984,6 +1073,63 @@ class ApiInterfaceRunnerTest(TestCase):
 
     @patch('api_interfaces.runner.load_custom_functions', return_value={})
     @patch('httprunner.HttpRunner.test_start')
+    def test_get_response_uses_last_redirect_response(self, mock_test_start, mock_load_funcs):
+        """重定向场景下应返回最后一跳响应，而不是首跳 301。"""
+        from .runner import InterfaceRunner
+
+        interface_data = {
+            'name': 'Redirect Test',
+            'type': 'http',
+            'method': 'GET',
+            'url': 'http://example.com/api/accounts/groups',
+            'headers': {},
+            'params': {},
+            'body': {},
+            'variables': {},
+            'validators': [],
+            'extract': {},
+            'setup_hooks': [],
+            'teardown_hooks': [],
+            'project_id': self.project.pk,
+        }
+
+        runner = InterfaceRunner(interface_data)
+        first_req_resp = SimpleNamespace(
+            request=SimpleNamespace(method='GET', url='http://example.com/api/accounts/groups', headers={}, body=None),
+            response=SimpleNamespace(status_code=301, headers={'Location': '/api/accounts/groups/'}, body=''),
+        )
+        final_req_resp = SimpleNamespace(
+            request=SimpleNamespace(method='GET', url='http://example.com/api/accounts/groups/', headers={}, body=None),
+            response=SimpleNamespace(
+                status_code=200,
+                headers={'Content-Type': 'application/json'},
+                body={'status': 'success', 'data': []},
+            ),
+        )
+        summary = SimpleNamespace(
+            step_results=[
+                SimpleNamespace(
+                    success=True,
+                    name='GET /api/accounts/groups',
+                    export_vars={},
+                    data=SimpleNamespace(
+                        req_resps=[first_req_resp, final_req_resp],
+                        stat=SimpleNamespace(response_time_ms=43.15, content_size=80),
+                        validators={},
+                    ),
+                ),
+            ],
+        )
+
+        with patch.object(runner, 'get_summary', return_value=summary):
+            response = runner.get_response()
+
+        self.assertEqual(response['status_code'], 200)
+        self.assertEqual(response['request']['url'], 'http://example.com/api/accounts/groups/')
+        self.assertEqual(response['response']['status_code'], 200)
+
+    @patch('api_interfaces.runner.load_custom_functions', return_value={})
+    @patch('httprunner.HttpRunner.test_start')
     def test_runner_with_hooks(self, mock_test_start, mock_load_funcs):
         """测试 Runner 带 hooks"""
         from .runner import InterfaceRunner
@@ -1031,6 +1177,49 @@ class ApiInterfaceRunnerTest(TestCase):
 
         runner = InterfaceRunner(interface_data)
         self.assertEqual(len(runner.teststeps), 1)
+
+    @patch('api_interfaces.runner.load_custom_functions', return_value={})
+    @patch('httprunner.HttpRunner.test_start')
+    def test_runner_accepts_frontend_payload_shapes(self, mock_test_start, mock_load_funcs):
+        """测试 Runner 接受前端 headers/params/body 结构"""
+        from .runner import InterfaceRunner
+
+        interface_data = {
+            'name': 'Frontend Shape Test',
+            'type': 'http',
+            'method': 'POST',
+            'url': 'http://example.com/api/test',
+            'headers': [
+                {'key': 'Authorization', 'value': 'Bearer token', 'description': '', 'enabled': True},
+                {'key': 'X-Disabled', 'value': 'skip', 'description': '', 'enabled': False},
+            ],
+            'params': [
+                {'key': 'page', 'value': '1', 'description': '', 'enabled': True},
+                {'key': 'debug', 'value': 'true', 'description': '', 'enabled': False},
+            ],
+            'body': {
+                'type': 'x-www-form-urlencoded',
+                'content': [
+                    {'key': 'username', 'value': 'tester', 'description': '', 'enabled': True},
+                    {'key': 'password', 'value': 'secret', 'description': '', 'enabled': True},
+                ],
+            },
+            'variables': {},
+            'validators': [],
+            'extract': {},
+            'setup_hooks': [],
+            'teardown_hooks': [],
+            'project_id': self.project.pk,
+        }
+
+        runner = InterfaceRunner(interface_data)
+        request = runner.teststeps[0].request
+
+        self.assertEqual(request.headers['Authorization'], 'Bearer token')
+        self.assertNotIn('X-Disabled', request.headers)
+        self.assertEqual(request.params, {'page': '1'})
+        self.assertEqual(request.data, {'username': 'tester', 'password': 'secret'})
+        self.assertIsNone(request.req_json)
 
     @patch('api_interfaces.runner.load_custom_functions')
     @patch('httprunner.HttpRunner.test_start')

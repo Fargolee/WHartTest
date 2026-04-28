@@ -192,6 +192,7 @@ class ApiModuleAPITest(TestCase):
         data = {'name': 'New Module', 'description': 'A test module'}
         response = self.client.post(self.base_url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn('id', response.data)
         self.assertEqual(response.data['name'], 'New Module')
         module = ApiModule.objects.get(name='New Module')
         self.assertEqual(module.project, self.project)

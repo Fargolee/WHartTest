@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import ApiInterface, ApiInterfaceResult
+from .payloads import normalize_key_value_pairs, normalize_request_body
 
 
 class ApiInterfaceModuleInfoSerializer(serializers.Serializer):
@@ -19,9 +20,22 @@ class ApiInterfaceSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
+        try:
+            data['headers'] = normalize_key_value_pairs(data.get('headers'), 'headers')
+        except ValueError:
+            data['headers'] = []
+        try:
+            data['params'] = normalize_key_value_pairs(data.get('params'), 'params')
+        except ValueError:
+            data['params'] = []
+        try:
+            data['body'] = normalize_request_body(data.get('body'))
+        except ValueError:
+            data['body'] = {'type': 'raw', 'content': data.get('body')}
         # Strip module_info from list responses, only include in detail
         request = self.context.get('request')
-        if request and not self.context.get('view', {}).kwargs.get('pk'):
+        view_kwargs = getattr(self.context.get('view'), 'kwargs', {}) or {}
+        if request and not view_kwargs.get('pk'):
             data.pop('module_info', None)
         return data
 
@@ -29,9 +43,17 @@ class ApiInterfaceSerializer(serializers.ModelSerializer):
         instance = getattr(self, 'instance', None)
         name = attrs.get('name')
         project = attrs.get('project') or (instance.project if instance else None)
+        view = self.context.get('view')
+        view_kwargs = getattr(view, 'kwargs', {}) or {}
+        project_id = project.id if project else None
 
-        if name and project:
-            query = ApiInterface.objects.filter(name=name, project=project)
+        if project_id is None and view:
+            project_pk = view_kwargs.get('project_pk')
+            if project_pk is not None:
+                project_id = int(project_pk)
+
+        if name and project_id is not None:
+            query = ApiInterface.objects.filter(name=name, project_id=project_id)
             if instance:
                 query = query.exclude(pk=instance.pk)
             if query.exists():
@@ -39,11 +61,35 @@ class ApiInterfaceSerializer(serializers.ModelSerializer):
                     {"name": [f"An interface named '{name}' already exists in this project."]}
                 )
 
-        module = attrs.get('module')
-        if module and project and module.project_id != project.id:
+        module = attrs.get('module', instance.module if instance else None)
+        if module and project_id is not None and module.project_id != project_id:
             raise serializers.ValidationError(
                 {"module": "Module must belong to the same project."}
             )
+
+        if 'headers' in attrs:
+            try:
+                attrs['headers'] = normalize_key_value_pairs(attrs.get('headers'), 'headers')
+            except ValueError as exc:
+                raise serializers.ValidationError({"headers": str(exc)}) from exc
+        elif instance is None:
+            attrs['headers'] = []
+
+        if 'params' in attrs:
+            try:
+                attrs['params'] = normalize_key_value_pairs(attrs.get('params'), 'params')
+            except ValueError as exc:
+                raise serializers.ValidationError({"params": str(exc)}) from exc
+        elif instance is None:
+            attrs['params'] = []
+
+        if 'body' in attrs:
+            try:
+                attrs['body'] = normalize_request_body(attrs.get('body'))
+            except ValueError as exc:
+                raise serializers.ValidationError({"body": str(exc)}) from exc
+        elif instance is None:
+            attrs['body'] = {'type': 'none', 'content': None}
 
         setup_hooks = attrs.get('setup_hooks', [])
         if not isinstance(setup_hooks, list):

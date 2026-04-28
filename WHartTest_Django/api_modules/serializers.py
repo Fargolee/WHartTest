@@ -18,15 +18,16 @@ class ApiModuleSerializer(serializers.ModelSerializer):
 
 
 class ApiModuleCreateSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = ApiModule
-        fields = ['name', 'parent', 'description']
+        fields = ['id', 'name', 'parent', 'description']
 
     def validate(self, attrs):
         parent = attrs.get('parent')
         # project will be set in perform_create from URL kwargs
         if parent:
-            request = self.context.get('request')
             view = self.context.get('view')
             project_pk = view.kwargs.get('project_pk') if view else None
             if project_pk and parent.project_id != int(project_pk):

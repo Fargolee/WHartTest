@@ -1019,8 +1019,8 @@ watch(() => tabsStore.tabs, () => {
         <!-- 接口详情 -->
         <ApiDetail
           :key="detailKey"
-          :module="selectedApi"
           :modules="getFilteredModules"
+          :selected-module="selectedApi"
           :interface="selectedInterface"
           :auto-debug="autoDebug"
           @refresh="handleRefresh"
