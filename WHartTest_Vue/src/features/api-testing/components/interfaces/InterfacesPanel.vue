@@ -890,21 +890,21 @@ watch(() => tabsStore.tabs, () => {
                             <div
                               v-for="api in noModuleInterfaces"
                               :key="api.id"
-                              class="!w-full !px-6 !py-2 !text-sm !text-gray-400 hover:!text-gray-300 !rounded !bg-[rgb(70,84,102,0.2)] hover:!bg-[rgb(70,84,102,0.4)] !min-w-0 !cursor-pointer !mt-1"
+                              class="no-module-interface-item !w-full !px-6 !py-2 !text-sm !text-gray-400 hover:!text-gray-300 !rounded !bg-[rgb(70,84,102,0.2)] hover:!bg-[rgb(70,84,102,0.4)] !min-w-0 !cursor-pointer !mt-1"
                               :class="{ '!bg-[rgb(70,84,102,0.4)]': selectedInterface?.id === api.id }"
                               @click="handleSelectNoModuleInterface(api)"
                             >
-                              <div class="!flex !items-center !justify-between">
-                                <div class="!flex !items-center !gap-2 !min-w-0 !flex-1">
+                              <div class="no-module-interface-main">
+                                <div class="no-module-interface-info">
                                   <a-tag
                                     :color="api.method === 'GET' ? 'blue' : api.method === 'POST' ? 'green' : api.method === 'PUT' ? 'orange' : 'red'"
                                     class="!w-16 !flex !justify-center !flex-shrink-0"
                                   >
                                     {{ api.method }}
                                   </a-tag>
-                                  <span class="!truncate" :title="api.name">{{ api.name }}</span>
+                                  <span class="no-module-interface-name !truncate" :title="api.name">{{ api.name }}</span>
                                 </div>
-                                <div class="!flex !items-center">
+                                <div class="no-module-interface-actions">
                                   <a-button
                                     type="text"
                                     size="mini"
@@ -1482,5 +1482,40 @@ watch(() => tabsStore.tabs, () => {
 .api-management--light .detail-view-shell {
   border: 1px solid rgba(15, 23, 42, 0.08);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+}
+
+.no-module-interface-item {
+  overflow: hidden;
+}
+
+.no-module-interface-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.no-module-interface-info {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 0.5rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.no-module-interface-name {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.no-module-interface-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: 1rem;
 }
 </style>

@@ -204,17 +204,17 @@ const handleInterfaceSelect = async (api: ApiInterface) => {
             :style="{ paddingLeft: `${paddingLeft + 4}px` }"
             @click="handleInterfaceSelect(api)"
           >
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2 min-w-0 flex-1">
+            <div class="module-tree__interface-main">
+              <div class="module-tree__interface-info">
                 <a-tag
                   :color="api.method === 'GET' ? 'blue' : api.method === 'POST' ? 'green' : api.method === 'PUT' ? 'orange' : 'red'"
                   class="!w-16 !flex !justify-center !flex-shrink-0"
                 >
                   {{ api.method }}
                 </a-tag>
-                <span class="truncate" :title="api.name">{{ api.name }}</span>
+                <span class="module-tree__interface-name truncate" :title="api.name">{{ api.name }}</span>
               </div>
-              <div class="flex items-center -mr-4 ml-4">
+              <div class="module-tree__interface-actions -mr-4 ml-4">
                 <a-button
                   type="text"
                   size="mini"
@@ -296,10 +296,41 @@ const handleInterfaceSelect = async (api: ApiInterface) => {
 .module-tree__interface-item {
   background: var(--module-interface-bg);
   color: var(--module-interface-text);
+  overflow: hidden;
 }
 
 .module-tree__interface-item:hover {
   background: var(--module-interface-hover-bg);
+}
+
+.module-tree__interface-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.module-tree__interface-info {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 0.5rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.module-tree__interface-name {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.module-tree__interface-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 :global(body.api-testing-theme) .module-tree {
