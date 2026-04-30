@@ -149,6 +149,38 @@ class ApiTestCaseViewSet(BaseModelViewSet):
         project = get_object_or_404(Project, pk=self.kwargs.get('project_pk'))
         serializer.save(created_by=self.request.user, project=project)
 
+    @staticmethod
+    def _build_single_step_order_map(testcase, target_step, new_order):
+        all_steps = list(testcase.steps.all().order_by('order'))
+        new_orders = {}
+        current_position = 1
+
+        for step in all_steps:
+            if step.id == target_step.id:
+                continue
+            if current_position == new_order:
+                new_orders[target_step.id] = new_order
+                current_position += 1
+            new_orders[step.id] = current_position
+            current_position += 1
+
+        if target_step.id not in new_orders:
+            new_orders[target_step.id] = current_position
+
+        return all_steps, new_orders
+
+    @staticmethod
+    def _apply_step_order_map(testcase, all_steps, new_orders):
+        for step in all_steps:
+            step.order = step.order + 1000
+            step.save(update_fields=['order'])
+
+        for step_id_to_update, final_order in new_orders.items():
+            ApiTestCaseStep.objects.filter(
+                id=step_id_to_update,
+                testcase=testcase
+            ).update(order=final_order)
+
     @action(detail=False)
     def available_interfaces(self, request, **kwargs):
         from api_interfaces.models import ApiInterface
@@ -411,32 +443,12 @@ class ApiTestCaseViewSet(BaseModelViewSet):
             with transaction.atomic():
                 if new_order is not None and int(new_order) != old_order:
                     new_order = int(new_order)
-                    all_steps = list(testcase.steps.all().order_by('order'))
-
-                    new_orders = {}
-                    current_position = 1
-
-                    for s in all_steps:
-                        if s.id == step.id:
-                            continue
-                        if current_position == new_order:
-                            new_orders[step.id] = new_order
-                            current_position += 1
-                        new_orders[s.id] = current_position
-                        current_position += 1
-
-                    if step.id not in new_orders:
-                        new_orders[step.id] = current_position
-
-                    for s in all_steps:
-                        s.order = s.order + 1000
-                        s.save(update_fields=['order'])
-
-                    for step_id_to_update, final_order in new_orders.items():
-                        ApiTestCaseStep.objects.filter(
-                            id=step_id_to_update,
-                            testcase=testcase
-                        ).update(order=final_order)
+                    all_steps, new_orders = self._build_single_step_order_map(
+                        testcase=testcase,
+                        target_step=step,
+                        new_order=new_order,
+                    )
+                    self._apply_step_order_map(testcase, all_steps, new_orders)
 
                     step.refresh_from_db()
 
@@ -471,14 +483,19 @@ class ApiTestCaseViewSet(BaseModelViewSet):
                         )
 
                     order_map = {s['step_id']: s['order'] for s in steps_data}
+                    all_steps = list(testcase.steps.all().order_by('order', 'id'))
+
+                    for step in all_steps:
+                        step.order = step.order + 1000
+                        step.save(update_fields=['order'])
 
                     for step in existing_steps:
                         if step.id in order_map:
                             step.order = order_map[step.id]
                             step.save(update_fields=['order'])
 
-                    all_steps = testcase.steps.all().order_by('order')
-                    for index, step in enumerate(all_steps, start=1):
+                    normalized_steps = testcase.steps.all().order_by('order', 'id')
+                    for index, step in enumerate(normalized_steps, start=1):
                         if step.order != index:
                             step.order = index
                             step.save(update_fields=['order'])
@@ -503,28 +520,13 @@ class ApiTestCaseViewSet(BaseModelViewSet):
                             ApiTestCaseStepSerializer(step).data
                         )
 
-                    step.order = 9999
-                    step.save(update_fields=['order'])
-
-                    if new_order > old_order:
-                        steps_to_update = testcase.steps.filter(
-                            order__gt=old_order,
-                            order__lte=new_order
-                        ).exclude(id=step.id)
-                        for s in steps_to_update:
-                            s.order -= 1
-                            s.save(update_fields=['order'])
-                    else:
-                        steps_to_update = testcase.steps.filter(
-                            order__gte=new_order,
-                            order__lt=old_order
-                        ).exclude(id=step.id)
-                        for s in steps_to_update:
-                            s.order += 1
-                            s.save(update_fields=['order'])
-
-                    step.order = new_order
-                    step.save(update_fields=['order'])
+                    all_steps, new_orders = self._build_single_step_order_map(
+                        testcase=testcase,
+                        target_step=step,
+                        new_order=new_order,
+                    )
+                    self._apply_step_order_map(testcase, all_steps, new_orders)
+                    step.refresh_from_db()
 
                     return Response(
                         ApiTestCaseStepSerializer(step).data

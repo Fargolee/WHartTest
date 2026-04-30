@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
 from django.test import TestCase
@@ -12,6 +13,7 @@ from .models import (
     ApiTestCaseTag, ApiTestCaseGroup, ApiTestCase,
     ApiTestCaseStep, ApiTestReport, ApiTestReportDetail,
 )
+from .runner import TestCaseRunner
 from .services import TestCaseService, TestExecutionService
 
 
@@ -524,6 +526,132 @@ class TestExecutionServiceTest(TestCase):
         self.assertEqual(stats['failure'], 1)
         self.assertEqual(stats['success_rate'], '50.00%')
 
+    @patch('api_testcases.services.TestCaseRunner')
+    def test_run_testcase_report_uses_assertions_instead_of_status_code(self, mock_runner_class):
+        testcase = ApiTestCase.objects.create(
+            name='Expected 500 Test', project=self.project, created_by=self.user,
+        )
+        step = ApiTestCaseStep.objects.create(
+            name='Step 1', order=1,
+            interface_data={'method': 'GET', 'url': '/expected-error'},
+            testcase=testcase,
+        )
+
+        step_results = [{
+            'name': step.name,
+            'success': True,
+            'elapsed': 0.12,
+            'step_type': 'request',
+            'data': {
+                'request': {
+                    'method': 'GET',
+                    'url': 'http://example.com/expected-error',
+                    'headers': {},
+                    'body': None,
+                },
+                'response': {
+                    'status_code': 500,
+                    'headers': {},
+                    'body': {'message': 'expected error'},
+                    'content_size': 32,
+                    'response_time_ms': 120,
+                },
+                'validators': {
+                    'success': True,
+                    'validate_extractor': [{'check_result': 'pass'}],
+                },
+                'extracted_variables': {},
+            },
+            'attachment': '',
+        }]
+        summary = {
+            'success': True,
+            'name': testcase.name,
+            'time': {'start_at': '2026-04-29T00:00:00', 'duration': 0.12},
+            'in_out': {'config_vars': {}, 'export_vars': {}},
+            'log': '',
+            'step_results': step_results,
+        }
+
+        mock_runner = MagicMock()
+        mock_runner.run_testcase.return_value = mock_runner
+        mock_runner.get_summary.return_value = summary
+        mock_runner.get_step_results.return_value = step_results
+        mock_runner_class.return_value = mock_runner
+
+        report = TestExecutionService.run_testcase(testcase, user=self.user)
+
+        self.assertEqual(report.status, 'success')
+        self.assertEqual(report.success_count, 1)
+        self.assertEqual(report.fail_count, 0)
+
+        detail = report.details.get()
+        self.assertTrue(detail.success)
+        self.assertEqual(detail.response['status_code'], 500)
+
+
+class TestCaseRunnerSummaryTest(TestCase):
+    """TestCaseRunner summary/result tests."""
+
+    @staticmethod
+    def _build_request_step_result(status_code=500, success=True, validators=None):
+        return SimpleNamespace(
+            name='Step 1',
+            step_type='request',
+            success=success,
+            elapsed=0.25,
+            export_vars={},
+            attachment='',
+            data=SimpleNamespace(
+                validators=validators or {'success': True},
+                req_resps=[
+                    SimpleNamespace(
+                        request=SimpleNamespace(
+                            method='GET',
+                            url='http://example.com/error',
+                            headers={},
+                            body=None,
+                        ),
+                        response=SimpleNamespace(
+                            status_code=status_code,
+                            headers={},
+                            body={'message': 'expected'},
+                        ),
+                    )
+                ],
+                stat=SimpleNamespace(content_size=16, response_time_ms=250),
+            ),
+        )
+
+    @patch('api_testcases.runner.HttpRunner.get_summary')
+    def test_get_step_results_uses_assertions_not_status_code(self, mock_get_summary):
+        mock_get_summary.return_value = SimpleNamespace(
+            step_results=[self._build_request_step_result(status_code=500, success=True)],
+        )
+
+        runner = TestCaseRunner.__new__(TestCaseRunner)
+        results = runner.get_step_results()
+
+        self.assertEqual(len(results), 1)
+        self.assertTrue(results[0]['success'])
+        self.assertEqual(results[0]['data']['response']['status_code'], 500)
+
+    @patch('api_testcases.runner.HttpRunner.get_summary')
+    def test_get_summary_uses_step_assertions_not_status_code(self, mock_get_summary):
+        mock_get_summary.return_value = SimpleNamespace(
+            name='Expected Error Test',
+            time=SimpleNamespace(start_at='2026-04-29T00:00:00', duration=0.25),
+            in_out=SimpleNamespace(config_vars={}, export_vars={}),
+            log='',
+            step_results=[self._build_request_step_result(status_code=500, success=True)],
+        )
+
+        runner = TestCaseRunner.__new__(TestCaseRunner)
+        summary = runner.get_summary()
+
+        self.assertTrue(summary['success'])
+        self.assertEqual(summary['step_results'][0]['data']['response']['status_code'], 500)
+
 
 class ApiTestCaseTagAPITest(TestCase):
     """ApiTestCaseTag API tests"""
@@ -848,6 +976,38 @@ class ApiTestCaseAPITest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         s3.refresh_from_db()
         self.assertEqual(s3.order, 1)
+
+    def test_reorder_steps_with_step_id_and_new_order_move_down(self):
+        """Single-step reorder also works when moving a step later in the sequence."""
+        tc = ApiTestCase.objects.create(
+            name='TC', project=self.project, created_by=self.user,
+        )
+        s1 = ApiTestCaseStep.objects.create(
+            name='Step 1', order=1,
+            interface_data={'method': 'GET'}, testcase=tc,
+        )
+        s2 = ApiTestCaseStep.objects.create(
+            name='Step 2', order=2,
+            interface_data={'method': 'POST'}, testcase=tc,
+        )
+        s3 = ApiTestCaseStep.objects.create(
+            name='Step 3', order=3,
+            interface_data={'method': 'PUT'}, testcase=tc,
+        )
+
+        response = self.client.post(
+            f'{self.base_url}{tc.pk}/reorder_steps/',
+            {'step_id': s1.pk, 'new_order': 3},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        s1.refresh_from_db()
+        s2.refresh_from_db()
+        s3.refresh_from_db()
+        self.assertEqual(s1.order, 3)
+        self.assertEqual(s2.order, 1)
+        self.assertEqual(s3.order, 2)
 
     def test_reorder_steps_with_steps_array(self):
         """Frontend can also send {steps: [{step_id, order}, ...]} for bulk reorder."""

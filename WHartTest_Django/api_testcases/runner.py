@@ -71,6 +71,24 @@ def load_custom_functions(project_id):
 class TestCaseRunner(HttpRunner):
     """Test case runner extending HttpRunner."""
 
+    @staticmethod
+    def _validators_indicate_failure(validators: Optional[Dict]) -> bool:
+        """Return True when validators explicitly mark the step as failed."""
+        if not isinstance(validators, dict) or not validators:
+            return False
+
+        if validators.get('success') is False:
+            return True
+
+        validate_extractor = validators.get('validate_extractor')
+        if not isinstance(validate_extractor, list):
+            return False
+
+        return any(
+            isinstance(validator, dict) and validator.get('check_result') == 'fail'
+            for validator in validate_extractor
+        )
+
     def _create_http_step(self, step_name: str, interface_data: Dict) -> RunRequest:
         """Create an HTTP request step."""
         step_obj = RunRequest(step_name)
@@ -362,16 +380,8 @@ class TestCaseRunner(HttpRunner):
 
         for step_result in summary.step_results:
             step_type = step_result.step_type
-            success = step_result.success
-
-            if hasattr(step_result.data, 'validators') and step_result.data.validators:
-                if 'success' in step_result.data.validators and step_result.data.validators['success'] is False:
-                    success = False
-                if 'validate_extractor' in step_result.data.validators:
-                    for validator in step_result.data.validators['validate_extractor']:
-                        if validator.get('check_result') == 'fail':
-                            success = False
-                            break
+            validators = getattr(step_result.data, 'validators', {})
+            success = step_result.success and not self._validators_indicate_failure(validators)
 
             result = {
                 'name': step_result.name,
@@ -380,15 +390,13 @@ class TestCaseRunner(HttpRunner):
                 'step_type': step_type,
                 'data': {
                     'extracted_variables': step_result.export_vars,
-                    'validators': getattr(step_result.data, 'validators', {})
+                    'validators': validators
                 },
                 'attachment': step_result.attachment
             }
 
             if step_type == 'request':
                 req_resp = step_result.data.req_resps[-1] if step_result.data.req_resps else None
-                if req_resp and req_resp.response.status_code >= 400:
-                    result['success'] = False
                 result['data'].update({
                     'request': {
                         'method': req_resp.request.method if req_resp else None,
@@ -430,9 +438,6 @@ class TestCaseRunner(HttpRunner):
         export_vars = {}
         for step in step_results:
             if not step['success']:
-                success = False
-                break
-            if step['step_type'] == 'request' and step['data'].get('response', {}).get('status_code', 0) >= 400:
                 success = False
                 break
             if step['data'].get('extracted_variables'):

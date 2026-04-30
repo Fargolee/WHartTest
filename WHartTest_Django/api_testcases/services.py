@@ -169,16 +169,6 @@ class TestExecutionService:
                             continue
 
                     step_success = step_result['success']
-                    validators = step_result['data']['validators']
-
-                    if validators:
-                        if 'success' in validators and validators['success'] is False:
-                            step_success = False
-                        if 'validate_extractor' in validators:
-                            for validator in validators['validate_extractor']:
-                                if validator.get('check_result') == 'fail':
-                                    step_success = False
-                                    break
 
                     ApiTestReportDetail.objects.create(
                         report=report,
