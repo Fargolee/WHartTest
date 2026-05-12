@@ -347,12 +347,51 @@ const handleDelete = async (module: ApiModule) => {
     onOk: async () => {
       try {
         formLoading.value = true
-        await deleteModule(module.id)
+        const previousActiveTabId = tabsStore.activeTabId
+        const response = await deleteModule(module.id)
+        const deletedInterfaceIds = Array.isArray(response.data?.deleted_interface_ids)
+          ? response.data.deleted_interface_ids.filter((id): id is number => Number.isInteger(id))
+          : []
         Message.success('删除模块成功')
+
+        removeInterfacesFromLocalLists(deletedInterfaceIds)
+
+        const removedTabIds = deletedInterfaceIds.flatMap(interfaceId =>
+          tabsStore.removeInterfaceTabs(interfaceId)
+        )
+        const deletedActiveTab = previousActiveTabId
+          ? removedTabIds.includes(previousActiveTabId)
+          : false
+        const selectedInterfaceDeleted = !!selectedInterface.value?.id
+          && deletedInterfaceIds.includes(selectedInterface.value.id)
+
+        if (selectedInterfaceDeleted) {
+          selectedInterface.value = undefined
+        }
+
+        expandedIds.value = expandedIds.value.filter(id => id !== module.id)
+
         if (selectedApi.value?.id === module.id) {
           selectedApi.value = undefined
+          interfaces.value = []
         }
-        fetchApiModules()
+
+        if (deletedActiveTab) {
+          if (tabsStore.activeTabId) {
+            handleTabChange(tabsStore.activeTabId)
+          } else {
+            viewMode.value = 'list'
+            detailKey.value++
+          }
+        } else if (!tabsStore.activeTabId && selectedInterfaceDeleted) {
+          viewMode.value = 'list'
+          detailKey.value++
+        }
+
+        await Promise.all([
+          fetchApiModules(),
+          fetchInterfaceListForDisplay()
+        ])
       } catch (error: any) {
         Message.error(error.message || '删除模块失败')
       } finally {
@@ -413,9 +452,19 @@ const handleUpdateInterface = (api: ApiInterface) => {
 }
 
 const removeInterfaceFromLocalLists = (interfaceId: number) => {
-  interfaces.value = interfaces.value.filter(item => item.id !== interfaceId)
-  noModuleInterfaces.value = noModuleInterfaces.value.filter(item => item.id !== interfaceId)
-  allInterfaces.value = allInterfaces.value.filter(item => item.id !== interfaceId)
+  removeInterfacesFromLocalLists([interfaceId])
+}
+
+const removeInterfacesFromLocalLists = (interfaceIds: number[]) => {
+  if (interfaceIds.length === 0) {
+    return
+  }
+
+  const interfaceIdSet = new Set(interfaceIds)
+
+  interfaces.value = interfaces.value.filter(item => !interfaceIdSet.has(item.id))
+  noModuleInterfaces.value = noModuleInterfaces.value.filter(item => !interfaceIdSet.has(item.id))
+  allInterfaces.value = allInterfaces.value.filter(item => !interfaceIdSet.has(item.id))
   hasNoModuleInterfaces.value = noModuleInterfaces.value.length > 0
 }
 

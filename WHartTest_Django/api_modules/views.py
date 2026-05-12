@@ -54,8 +54,23 @@ class ApiModuleViewSet(BaseModelViewSet):
                 {'detail': 'Cannot delete a module that has child modules.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        from api_interfaces.models import ApiInterface
+
+        deleted_interface_ids = list(
+            ApiInterface.objects.filter(module=instance).values_list('id', flat=True)
+        )
+        if deleted_interface_ids:
+            ApiInterface.objects.filter(id__in=deleted_interface_ids).delete()
+
         self.perform_destroy(instance)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(
+            {
+                'deleted_interface_ids': deleted_interface_ids,
+                'deleted_interface_count': len(deleted_interface_ids),
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=False, methods=['get'])
     def tree(self, request, *args, **kwargs):

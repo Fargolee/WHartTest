@@ -4,6 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework.test import APIClient
 from rest_framework import status
 
+from api_interfaces.models import ApiInterface
 from projects.models import Project, ProjectMember
 from .models import ApiModule
 
@@ -262,8 +263,49 @@ class ApiModuleAPITest(TestCase):
             name='To Delete', project=self.project, created_by=self.user,
         )
         response = self.client.delete(f'{self.base_url}{module.pk}/')
-        self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_204_NO_CONTENT])
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(ApiModule.objects.filter(pk=module.pk).exists())
+        self.assertEqual(response.data['deleted_interface_count'], 0)
+        self.assertEqual(response.data['deleted_interface_ids'], [])
+
+    def test_delete_module_removes_linked_interfaces(self):
+        """测试删除模块时会同步删除模块下的接口"""
+        module = ApiModule.objects.create(
+            name='Module With APIs', project=self.project, created_by=self.user,
+        )
+        interface_1 = ApiInterface.objects.create(
+            name='Delete API 1',
+            type='http',
+            method='GET',
+            url='/api/delete-1',
+            project=self.project,
+            module=module,
+            created_by=self.user,
+        )
+        interface_2 = ApiInterface.objects.create(
+            name='Delete API 2',
+            type='http',
+            method='POST',
+            url='/api/delete-2',
+            project=self.project,
+            module=module,
+            created_by=self.user,
+        )
+
+        response = self.client.delete(f'{self.base_url}{module.pk}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(ApiModule.objects.filter(pk=module.pk).exists())
+        self.assertFalse(
+            ApiInterface.objects.filter(
+                pk__in=[interface_1.pk, interface_2.pk]
+            ).exists()
+        )
+        self.assertEqual(
+            sorted(response.data['deleted_interface_ids']),
+            sorted([interface_1.pk, interface_2.pk]),
+        )
+        self.assertEqual(response.data['deleted_interface_count'], 2)
 
     def test_delete_module_with_children_blocked(self):
         """测试删除有子模块的模块被阻止"""

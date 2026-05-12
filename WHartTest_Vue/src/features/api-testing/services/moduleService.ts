@@ -2,6 +2,11 @@ import { request } from '@/utils/request';
 import { useProjectStore } from '@/store/projectStore';
 import type { ApiModule } from '../types/module';
 
+export interface ApiModuleDeleteResult {
+  deleted_interface_ids: number[];
+  deleted_interface_count: number;
+}
+
 const base = (projectId: number) => `/projects/${projectId}/api-modules`;
 
 export const moduleService = {
@@ -18,7 +23,7 @@ export const moduleService = {
     request<ApiModule>({ url: `${base(projectId)}/${id}/`, method: 'PUT', data }),
 
   delete: (projectId: number, id: number) =>
-    request<void>({ url: `${base(projectId)}/${id}/`, method: 'DELETE' }),
+    request<ApiModuleDeleteResult>({ url: `${base(projectId)}/${id}/`, method: 'DELETE' }),
 
   tree: (projectId: number) =>
     request<ApiModule[]>({ url: `${base(projectId)}/tree/`, method: 'GET' }),
