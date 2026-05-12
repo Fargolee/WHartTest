@@ -51,7 +51,6 @@ const stepTypes = [
 
 const handleAddStep = (type: string) => {
   if (!props.testCaseId) {
-    Message.info('正在自动保存用例基础信息...')
     emit('save-test-case', () => {
       setTimeout(() => {
         handleAddStep(type)
