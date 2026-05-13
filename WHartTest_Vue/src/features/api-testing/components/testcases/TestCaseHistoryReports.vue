@@ -4,8 +4,11 @@ import { Message, Tag as ATag, Button as AButton } from '@arco-design/web-vue'
 import type { TableColumnData } from '@arco-design/web-vue'
 import { testcaseService } from '../../services/testcaseService'
 import type { TestCaseHistoryReport } from '../../types/testcase'
+import type { PaginatedResponse } from '../../types/common'
 import { useProjectStore } from '@/store/projectStore'
 import dayjs from 'dayjs'
+
+type HistoryReportsPayload = TestCaseHistoryReport[] | PaginatedResponse<TestCaseHistoryReport>
 
 const formatDuration = (ms: number): string => {
   const roundedMs = Math.round(ms * 100) / 100
@@ -53,6 +56,27 @@ const emit = defineEmits(['update:pagination', 'view-report'])
 const projectStore = useProjectStore()
 const loading = ref(false)
 const reports = ref<TestCaseHistoryReport[]>([])
+
+const normalizeHistoryReports = (payload?: HistoryReportsPayload) => {
+  if (Array.isArray(payload)) {
+    return {
+      results: payload,
+      total: payload.length
+    }
+  }
+
+  if (payload && Array.isArray(payload.results)) {
+    return {
+      results: payload.results,
+      total: payload.count ?? payload.results.length
+    }
+  }
+
+  return {
+    results: [],
+    total: 0
+  }
+}
 
 const columns: TableColumnData[] = [
   {
@@ -167,10 +191,12 @@ const fetchHistoryReports = async () => {
     })
 
     if (res.success) {
-      reports.value = Array.isArray(res.data) ? res.data : []
+      const { results, total } = normalizeHistoryReports(res.data as HistoryReportsPayload | undefined)
+
+      reports.value = results
       emit('update:pagination', {
         ...props.pagination,
-        total: res.total || reports.value.length
+        total: res.total ?? total
       })
     }
   } catch (error) {

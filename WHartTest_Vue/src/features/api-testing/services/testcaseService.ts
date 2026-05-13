@@ -2,6 +2,7 @@ import { request } from '@/utils/request';
 import { useProjectStore } from '@/store/projectStore';
 import type { ApiTestCase, ApiTestCaseStep, ApiTestCaseTag } from '../types/testcase';
 import type { TestCaseHistoryReport as _TestCaseHistoryReport, Tag as _Tag, TagStatistics as _TagStatistics } from '../types/testcase';
+import type { PaginatedResponse } from '../types/common';
 import { testcaseTagService } from './testcaseTagService';
 
 const base = (projectId: number) => `/projects/${projectId}/api-testcases`;
@@ -38,7 +39,11 @@ export const testcaseService = {
     request<any[]>({ url: `${base(projectId)}/${id}/referenced_interfaces/`, method: 'GET' }),
 
   historyReports: (projectId: number, id: number, params?: Record<string, any>) =>
-    request<any[]>({ url: `${base(projectId)}/${id}/history_reports/`, method: 'GET', params }),
+    request<PaginatedResponse<_TestCaseHistoryReport> | _TestCaseHistoryReport[]>({
+      url: `${base(projectId)}/${id}/history_reports/`,
+      method: 'GET',
+      params
+    }),
 
   updateStep: (projectId: number, id: number, data: { step_id: number } & Partial<ApiTestCaseStep>) =>
     request<ApiTestCaseStep>({ url: `${base(projectId)}/${id}/update_step/`, method: 'PUT', data }),
