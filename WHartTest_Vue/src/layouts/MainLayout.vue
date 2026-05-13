@@ -387,6 +387,7 @@ const activeMenu = computed(() => {
   if (path.startsWith('/projects')) return 'projects';
   if (path.startsWith('/requirements')) return 'requirements'; // 添加对需求管理路由的识别
   if (path.startsWith('/api-testing')) return 'api-testing';
+  if (path.startsWith('/ui-automation')) return 'ui-automation';
   if (path.startsWith('/testsuites')) return 'testsuites'; // 添加对测试套件路由的识别
   if (path.startsWith('/test-executions')) return 'test-executions'; // 添加对执行历史路由的识别
   if (path.startsWith('/testcases')) return 'testcases';
