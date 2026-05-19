@@ -80,6 +80,10 @@ const columns: TableColumnData[] = [
     slotName: 'operations'
   }
 ]
+
+const handleSelectionChange = (selectedKeys: (string | number)[]) => {
+  emit('update:selectedRowKeys', selectedKeys.map(key => Number(key)))
+}
 </script>
 
 <template>
@@ -92,12 +96,13 @@ const columns: TableColumnData[] = [
       :bordered="false"
       :stripe="true"
       row-key="id"
-      :rowSelection="{
+      :row-selection="{
         type: 'checkbox',
         showCheckedAll: true,
         selectedRowKeys,
-        onChange: (selectedKeys: number[]) => emit('update:selectedRowKeys', selectedKeys)
+        onlyCurrent: false
       }"
+      @selection-change="handleSelectionChange"
       class="custom-table"
     >
       <template #empty>

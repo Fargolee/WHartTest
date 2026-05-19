@@ -183,6 +183,46 @@ const handleDelete = async (record: ApiSyncConfig) => {
   })
 }
 
+const handleBatchDelete = async () => {
+  if (!selectedRowKeys.value.length) {
+    Message.warning('请先选择要删除的同步配置')
+    return
+  }
+
+  const ids = [...selectedRowKeys.value]
+
+  Modal.warning({
+    title: '确认批量删除',
+    content: `确定要删除选中的 ${ids.length} 条同步配置吗？此操作不可恢复。`,
+    okText: '确认删除',
+    cancelText: '取消',
+    async onOk() {
+      try {
+        loading.value = true
+        const results = await Promise.allSettled(ids.map(id => syncApi.deleteApiConfig(id)))
+        const failedCount = results.filter(result => result.status === 'rejected').length
+        const successCount = ids.length - failedCount
+
+        if (successCount > 0) {
+          Message.success(`已删除 ${successCount} 条同步配置`)
+        }
+
+        if (failedCount > 0) {
+          Message.warning(`${failedCount} 条同步配置删除失败，请重试`)
+        }
+
+        selectedRowKeys.value = []
+        await fetchConfigs()
+      } catch (error) {
+        Message.error('批量删除失败')
+        console.error(error)
+      } finally {
+        loading.value = false
+      }
+    }
+  })
+}
+
 const handleSyncNow = async (record: ApiSyncConfig) => {
   try {
     loading.value = true
@@ -198,12 +238,14 @@ const handleSyncNow = async (record: ApiSyncConfig) => {
 
 const handlePageChange = (page: number) => {
   currentPage.value = page
+  selectedRowKeys.value = []
   fetchConfigs()
 }
 
 const handlePageSizeChange = (size: number) => {
   pageSize.value = size
   currentPage.value = 1
+  selectedRowKeys.value = []
   fetchConfigs()
 }
 
@@ -227,10 +269,12 @@ const handleCreate = () => {
 // 监听项目变化
 watch(() => projectStore.currentProject?.id, (newProjectId) => {
   if (newProjectId) {
+    selectedRowKeys.value = []
     fetchConfigs()
   } else {
     configs.value = []
     total.value = 0
+    selectedRowKeys.value = []
   }
 })
 
@@ -247,12 +291,23 @@ onMounted(() => {
     <div class="api-config-header px-8 py-6 border-b">
       <div class="flex items-center justify-between">
         <h1 class="api-config-title text-xl font-semibold">接口同步配置</h1>
-        <a-button type="primary" :loading="loading" @click="handleCreate">
-          <template #icon>
-            <icon-plus />
-          </template>
-          新建配置
-        </a-button>
+        <div class="flex items-center gap-2">
+          <a-button
+            type="outline"
+            status="danger"
+            :disabled="selectedRowKeys.length === 0"
+            :loading="loading"
+            @click="handleBatchDelete"
+          >
+            批量删除<span v-if="selectedRowKeys.length > 0">（{{ selectedRowKeys.length }}）</span>
+          </a-button>
+          <a-button type="primary" :loading="loading" @click="handleCreate">
+            <template #icon>
+              <icon-plus />
+            </template>
+            新建配置
+          </a-button>
+        </div>
       </div>
       <p class="api-config-subtitle mt-2 text-sm">管理接口、用例和测试步骤之间的同步关系</p>
     </div>
