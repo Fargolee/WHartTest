@@ -109,10 +109,6 @@
             </div>
           </div>
           <div v-if="canPreviewDiagram" class="diagram-preview-actions">
-            <a-button v-if="canPreviewDiagram" type="outline" size="mini" class="diagram-preview-btn" @click="handlePreviewDiagram">
-              <template #icon><icon-eye /></template>
-              {{ pageText.previewDiagram }}
-            </a-button>
             <a-button v-if="canPreviewDiagram" type="text" size="mini" class="diagram-preview-btn" @click="openDiagramInNewTab">
               {{ pageText.openInNewTab }}
             </a-button>
@@ -142,10 +138,13 @@
           data-i18n-skip
           v-html="formattedContent"
         ></div>
-        <div v-if="canPreviewHtml && message.messageType === 'ai'" class="diagram-preview-actions">
-          <a-button type="outline" size="mini" class="diagram-preview-btn" @click="handlePreviewHtml">
+        <div v-if="(canPreviewHtml || canPreviewDiagram) && message.messageType === 'ai'" class="diagram-preview-actions">
+          <a-button v-if="canPreviewHtml" type="outline" size="mini" class="diagram-preview-btn" @click="handlePreviewHtml">
             <template #icon><icon-eye /></template>
             {{ pageText.previewHtml }}
+          </a-button>
+          <a-button v-if="canPreviewDiagram" type="text" size="mini" class="diagram-preview-btn" @click="openDiagramInNewTab">
+            {{ pageText.openInNewTab }}
           </a-button>
         </div>
       </div>
@@ -471,9 +470,9 @@ const isStreamingMessage = computed(() => {
          props.message.content.length > 0;
 });
 
-// 从工具消息中提取图表XML（display_diagram/edit_diagram）
+// 从消息内容中提取图表XML（display_diagram/edit_diagram）
 const diagramPayload = computed(() => {
-  if (props.message.messageType !== 'tool') return null;
+  if (props.message.isLoading) return null;
   return extractDiagramToolPayload(props.message.content);
 });
 

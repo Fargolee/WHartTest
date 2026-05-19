@@ -128,6 +128,8 @@
       v-model:visible="htmlPreviewVisible"
       :title="pageText.htmlPreview"
       :width="'90%'"
+      modal-class="html-preview-modal"
+      :body-style="{ padding: '0', maxHeight: 'calc(100vh - 96px)', overflow: 'hidden' }"
       :footer="false"
       :mask-closable="true"
       :unmount-on-close="true"
@@ -147,7 +149,7 @@
         </a-button>
         <iframe
           class="diagram-preview-iframe html-preview-iframe"
-          :srcdoc="htmlPreviewContent"
+          :srcdoc="htmlPreviewIframeSrcdoc"
           sandbox="allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
         ></iframe>
       </div>
@@ -370,6 +372,43 @@ interface HtmlPreviewPayload {
   sourceMessage: ChatMessage;
 }
 
+const HTML_PREVIEW_STYLE_ID = 'wharttest-html-preview-style';
+const HTML_PREVIEW_BASE_STYLE = `
+<style id="${HTML_PREVIEW_STYLE_ID}">
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    background: #fff;
+  }
+
+  body {
+    box-sizing: border-box;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+</style>`;
+
+const buildHtmlPreviewSrcdoc = (html: string): string => {
+  if (!html) return '';
+
+  if (new RegExp(`id=["']${HTML_PREVIEW_STYLE_ID}["']`, 'i').test(html)) {
+    return html;
+  }
+
+  if (/<head[^>]*>/i.test(html)) {
+    return html.replace(/<head[^>]*>/i, (match) => `${match}${HTML_PREVIEW_BASE_STYLE}`);
+  }
+
+  if (/<html[^>]*>/i.test(html)) {
+    return html.replace(/<html[^>]*>/i, (match) => `${match}<head>${HTML_PREVIEW_BASE_STYLE}</head>`);
+  }
+
+  return `<!DOCTYPE html><html lang="zh-CN"><head>${HTML_PREVIEW_BASE_STYLE}</head><body>${html}</body></html>`;
+};
+
 const messages = ref<ChatMessage[]>([]);
 const isLoading = ref(false);
 const sessionId = ref<string>('');
@@ -396,6 +435,7 @@ const isWeixinConnectVisible = ref(false);
 const htmlPreviewContent = ref('');
 const htmlPreviewContainerRef = ref<HTMLElement | null>(null);
 const isHtmlPreviewFullscreen = ref(false);
+const htmlPreviewIframeSrcdoc = computed(() => buildHtmlPreviewSrcdoc(htmlPreviewContent.value));
 
 // 工具图片悬浮预览（可拖动）
 const floatingToolImageSrc = ref<string | null>(null);
@@ -2417,10 +2457,49 @@ export default {
 
 .html-preview-wrapper {
   position: relative;
+  height: min(86vh, calc(100vh - 96px));
+  min-height: 320px;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .html-preview-iframe {
   display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+  background: #fff;
+}
+
+.html-preview-wrapper:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border: none;
+  border-radius: 0;
+}
+
+.html-preview-wrapper:fullscreen .html-preview-iframe {
+  height: 100%;
+}
+
+.html-preview-wrapper:fullscreen .html-preview-fullscreen-btn {
+  top: 16px;
+  right: 16px;
+}
+
+:deep(.html-preview-modal .arco-modal-body) {
+  padding: 0 !important;
+  max-height: calc(100vh - 96px) !important;
+  overflow: hidden !important;
+}
+
+@media (max-width: 768px) {
+  :deep(.html-preview-modal .arco-modal-body) {
+    max-height: calc(100vh - 72px) !important;
+  }
 }
 
 .html-preview-fullscreen-btn {
