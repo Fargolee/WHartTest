@@ -218,10 +218,6 @@ olefile>=0.46
 # https://github.com/python-pillow/Pillow/blob/main/LICENSE
 Pillow==11.3.0
 
-# PDF图片提取 - AGPL许可证 (当前版本: 1.26.7)
-# https://github.com/pymupdf/PyMuPDF/blob/main/COPYING
-PyMuPDF==1.26.7
-
 # Markdown文档处理 - BSD许可证 (当前版本: 3.9)
 # https://github.com/Python-Markdown/markdown/blob/master/LICENSE.md
 markdown==3.9
