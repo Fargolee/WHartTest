@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "updated_at": "2026-05-21T14:35:19Z",
+  "updated_at": "2026-05-21T14:38:43Z",
   "skills": [
     {
       "id": "agent-browser-skill",
@@ -38,6 +38,24 @@
       "author": "duanxiangchun",
       "tags": ["playwright", "browser", "automation"],
       "zip_path": "playwright-skill.zip"
+    },
+    {
+      "id": "playwright-cli",
+      "name": "playwright-cli",
+      "description": "基于微软官方 @playwright/cli 的交互式浏览器自动化技能。通过标准化命令行会话实现极高稳定性的浏览器操作，防止挂起超时。",
+      "version": "1.0.0",
+      "author": "Microsoft Corporation",
+      "tags": ["playwright", "browser", "automation"],
+      "zip_path": "playwright-cli.zip"
+    },
+    {
+      "id": "ui-automation",
+      "name": "ui-automation",
+      "description": "WHartTest UI 自动化管理工具。用于创建、编辑、删除 UI 测试模块、页面、元素、页面步骤和测试用例。支持执行记录查询和错误分析。当需要将浏览器技能获取到的页面元素保存到平台、创建 UI 自动化用例、执行测试或分析执行结果时使用。元素采集默认优先 agent-browser-skill，无法覆盖时再用 playwright-skill 兜底。",
+      "version": "1.0.0",
+      "author": "duanxiangchun",
+      "tags": ["ui", "automation", "wharttest"],
+      "zip_path": "ui-automation-skill.zip"
     },
     {
       "id": "weknora-kb",
